@@ -1,0 +1,11 @@
+{
+  "name": "ng-spring-data-rest",
+  "version": "1.0.0",
+  "dependencies": {
+    "argparse": "^1.0.10",
+    "axios": "^0.19.2",
+    "axios-cookiejar-support": "^0.5.1",
+    "qs": "^6.9.1",
+    "tough-cookie": "^3.0.1"
+  }
+}
