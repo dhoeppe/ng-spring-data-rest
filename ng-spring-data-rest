@@ -1,0 +1,151 @@
+#!/usr/bin/env node
+
+/*
+ * This file is part of the ng-spring-data-rest project (https://github.com/dhoeppe/ng-spring-data-rest).
+ * Copyright (c) 2020 Daniel Höppe.
+ *
+ * ng-spring-data-rest is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 3.
+ *
+ * ng-spring-data-rest is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with ng-spring-data-rest.  If not, see https://github.com/dhoeppe/ng-spring-data-rest.
+ */
+
+'use strict';
+
+function parseJSON(file) {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+const path = require('path');
+const fs = require('fs');
+const ArgumentParser = require('argparse').ArgumentParser;
+const pkg = parseJSON(path.join(__dirname, 'package.json'));
+
+const argParser = new ArgumentParser({
+                                         version: pkg.version,
+                                         addHelp: true,
+                                         description: 'Angular class and service generator for use with' +
+                                             ' Spring Data REST and @lagoshny/ngx-hal-client. Generates files' +
+                                             ' based on the provided JSON schema and ALPS profiles.' +
+                                             ' Allows simple modifications of the generated files.'
+                                     });
+argParser.addArgument(
+    ['-b', '--base-url'],
+    {
+        help: 'The base URL to the Spring Data REST server. This property is required.',
+        dest: 'baseURL',
+        metavar: 'BASEURL',
+        required: true
+    });
+argParser.addArgument(
+    ['-u', '--user'],
+    {
+        help: 'The username to be used when authenticating with the Spring Data REST server.' +
+            ' This property is required, when authentication is used.',
+        dest: 'username',
+        metavar: 'USERNAME'
+    });
+argParser.addArgument(
+    ['-p', '--password'],
+    {
+        help: 'The password to be used when authenticating with the Spring Data REST server.' +
+            ' This property is required, when authentication is used.',
+        dest: 'password',
+        metavar: 'PASSWORD'
+    });
+argParser.addArgument(
+    ['-a', '--auth'],
+    {
+        help: 'The authentication method to use.\n' +
+            'The authentication method to use, defaults to NONE.\n' +
+            'Possible values are "NONE", "COOKIE" and "OAUTH2".',
+        dest: 'authMethod',
+        metavar: 'AUTH_METHOD',
+        defaultValue: 'NONE',
+        choices: ['NONE', 'COOKIE', 'OAUTH2']
+    });
+argParser.addArgument(
+    ['--auth-endpoint'],
+    {
+        help: 'The authentication endpoint URL. When using OAuth2 this is used as token endpoint.',
+        dest: 'authEndpoint',
+        metavar: 'AUTH_ENDPOINT'
+    });
+argParser.addArgument(
+    ['--oauth-flow'],
+    {
+        help: 'The OAuth2 flow to use when authenticating. Currently only "PASSWORD" is supported.',
+        dest: 'oauthFlow',
+        metavar: 'OAUTH_FLOW',
+        choices: ['PASSWORD']
+    });
+argParser.addArgument(
+    ['--client'],
+    {
+        help: 'The client name to use for OAuth2 authentication.',
+        dest: 'clientId',
+        metavar: 'CLIENT_NAME'
+    });
+argParser.addArgument(
+    ['--client-password'],
+    {
+        help: 'The client password to use for OAuth2 authentication.',
+        dest: 'clientPassword',
+        metavar: 'CLIENT_PASSWORD'
+    });
+argParser.addArgument(
+    ['--no-additional-properties'],
+    {
+        help: 'A switch to add "additionalProperties": false to every JSON schema before it is converted.',
+        dest: 'noAdditionalProperties',
+        action: 'storeTrue'
+    });
+argParser.addArgument(
+    ['--output-dir'],
+    {
+        help: 'Path of the output directory. If the directory does not exist, it is created.\n' +
+            'Defaults to "./gen".',
+        dest: 'outputDir',
+        defaultValue: './gen',
+        metavar: 'OUTPUT_DIR'
+    });
+argParser.addArgument(
+    ['--model-dir'],
+    {
+        help: 'Name of the model directory.',
+        dest: 'modelDir',
+        defaultValue: 'model',
+        metavar: 'MODEL_DIR'
+    });
+argParser.addArgument(
+    ['--service-dir'],
+    {
+        help: 'Name of the service directory.',
+        dest: 'serviceDir',
+        defaultValue: 'service',
+        metavar: 'SERVICE_DIR'
+    });
+// TODO add optional config file for modifying input to the json-schema-to-typescript converter
+const args = argParser.parseArgs();
+
+if (args.authMethod !== 'NONE' && (!args.username || !args.password)) {
+    console.error(
+        'Authentication method is specified, but either username or password is not provided.');
+    process.exit(1);
+}
+if (args.authMethod === 'OAUTH2') {
+    switch (args.oauthFlow) {
+        case 'PASSWORD':
+            if (!args.clientId || !args.clientPassword) {
+                console.error(
+                    'OAuth2 password flow was chosen as authentication method, but client credentials are incomplete.');
+                process.exit(2);
+            }
+            break;
+    }
+}
+
+// Load generator script and apply it on the arguments.
+const ngSpringDataRest = require('./ng-spring-data-rest.js');
+ngSpringDataRest(args);
