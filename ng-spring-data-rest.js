@@ -11,20 +11,24 @@
 
 'use strict';
 
-// Declare constants
-const REGEXP_TYPESCRIPT_INTERFACE_NAME = /^(export interface )(\w+)( {)$/m;
-const PATH_CLASS_TEMPLATE = './templates/class';
-const PATH_SERVICE_TEMPLATE = './templates/service';
-
 // Load dependencies
+const path = require('path');
 const axios = require('axios').default;
 const axiosCookieJarSupport = require('axios-cookiejar-support').default;
 const tough = require('tough-cookie');
 const qs = require('qs');
 const jsonTs = require('json-schema-to-typescript');
 const fs = require('fs');
+const fsExtra = require('fs-extra');
 const mustache = require('mustache');
 const _ = require('lodash');
+
+// Declare constants
+const REGEXP_TYPESCRIPT_INTERFACE_NAME = /^(export interface )(\w+)( {)$/m;
+const PATH_CLASS_TEMPLATE = path.join(__dirname, './templates/class');
+const PATH_SERVICE_TEMPLATE = path.join(__dirname, './templates/service');
+const PATH_MODELS_TEMPLATE = path.join(__dirname, './templates/models');
+const PATH_SERVICES_TEMPLATE = path.join(__dirname, './templates/services');
 
 // Declare global variables
 let axiosInstance = undefined;
@@ -78,6 +82,10 @@ async function doGenerate(options) {
                  {recursive: true});
     fs.mkdirSync(`${options.outputDir}/${options.serviceDir}`,
                  {recursive: true});
+
+    // Empty output directory
+    fsExtra.emptyDirSync(`${options.outputDir}/${options.modelDir}`);
+    fsExtra.emptyDirSync(`${options.outputDir}/${options.serviceDir}`);
     
     // Process JSON schemas based on configuration.
     preProcessSchemas(jsonSchemas, options);
@@ -246,62 +254,87 @@ function preProcessSchemas(schemas, config) {
  * @param modelDir The name of the model directory.
  * @param serviceDir The name of the service directory.
  */
-function generateTypeScriptFromSchema(schemas, entities, outputDir, modelDir, serviceDir) {
+async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelDir, serviceDir) {
     console.log(`Generating files.`);
     
     const classTemplateString = fs.readFileSync(PATH_CLASS_TEMPLATE).toString();
     const serviceTemplateString = fs.readFileSync(PATH_SERVICE_TEMPLATE).toString();
-    
+    const modelsTemplateString = fs.readFileSync(PATH_MODELS_TEMPLATE).toString();
+    const servicesTemplateString = fs.readFileSync(PATH_SERVICES_TEMPLATE).toString();
+    const modelsTemplateData = { 'models': [] };
+    const servicesTemplateData = { 'services': [] };
+
     for (let index = 0; index < schemas.length; index++) {
         const schema = schemas[index];
         const entity = entities[index];
-        
+
         // Apply json-schema-to-typescript conversion.
-        jsonTs.compile(schema, schema.title)
-            .then(tsFile => {
-                // Add I to the beginning of each class name to indicate interface.
-                tsFile = tsFile.replace(REGEXP_TYPESCRIPT_INTERFACE_NAME,
-                                        '$1I$2$3');
-                
-                // Construct filename for generated interface file.
-                let matches = tsFile.match(REGEXP_TYPESCRIPT_INTERFACE_NAME);
-                
-                const interfaceName = matches[2];
-                const interfaceNameLower = interfaceName.toLowerCase();
-                const className = interfaceName.substr(1);
-                const classNameLower = className.toLowerCase();
-                const classNameSnake = _.camelCase(className);
-                
-                // Write interface file.
-                const interfaceFileName = `${interfaceNameLower}.d.ts`;
-                fs.writeFileSync(`${outputDir}/${modelDir}/${interfaceFileName}`,
-                                 tsFile);
-                
-                // Create class from template file.
-                const classTemplateData = {
-                    'interfaceName': interfaceName,
-                    'interfaceNameLower': interfaceNameLower,
-                    'className': className
-                };
-                const renderedClass = mustache.render(classTemplateString,
-                                                      classTemplateData);
-                const classFileName = `${classNameSnake}.ts`;
-                fs.writeFileSync(`${outputDir}/${modelDir}/${classFileName}`,
-                                 renderedClass);
-                
-                // Create service from template file.
-                const serviceTemplateData = {
-                    'className': className,
-                    'classNameLower': classNameLower,
-                    'repositoryName': entity
-                };
-                const renderedService = mustache.render(serviceTemplateString,
-                                                        serviceTemplateData);
-                const serviceFileName = `${classNameSnake}.service.ts`;
-                fs.writeFileSync(`${outputDir}/${serviceDir}/${serviceFileName}`,
-                                 renderedService);
-            });
+        let tsFile = await jsonTs.compile(schema, schema.title);
+
+        // Add I to the beginning of each class name to indicate interface.
+        tsFile = tsFile.replace(REGEXP_TYPESCRIPT_INTERFACE_NAME, '$1I$2$3');
+
+        // Construct filename for generated interface file.
+        let matches = tsFile.match(REGEXP_TYPESCRIPT_INTERFACE_NAME);
+
+        const interfaceName = matches[2];
+        const interfaceNameKebab = _.kebabCase(interfaceName);
+        const className = interfaceName.substr(1);
+        const classNameKebab = _.kebabCase(className);
+
+        // Write interface file.
+        const interfaceFileName = `${interfaceNameKebab}.d.ts`;
+        fs.writeFileSync(`${outputDir}/${modelDir}/${interfaceFileName}`,
+                         tsFile);
+
+        // Create class from template file.
+        const classTemplateData = {
+            'interfaceName': interfaceName,
+            'interfaceNameKebab': interfaceNameKebab,
+            'className': className
+        };
+        const renderedClass = mustache.render(classTemplateString,
+                                              classTemplateData);
+        const classFileName = `${classNameKebab}.ts`;
+        fs.writeFileSync(`${outputDir}/${modelDir}/${classFileName}`,
+                         renderedClass);
+
+        // Create service from template file.
+        const serviceTemplateData = {
+            'className': className,
+            'classNameKebab': classNameKebab,
+            'modelDir': modelDir,
+            'repositoryName': entity
+        };
+        const renderedService = mustache.render(serviceTemplateString,
+                                                serviceTemplateData);
+        const serviceFileName = `${classNameKebab}.service.ts`;
+        fs.writeFileSync(`${outputDir}/${serviceDir}/${serviceFileName}`,
+                         renderedService);
+
+        // Append to models and services list
+        modelsTemplateData.models.push({
+            'modelClass': interfaceName,
+            'modelDir': modelDir,
+            'modelFile': interfaceNameKebab
+        });
+        modelsTemplateData.models.push({
+            'modelClass': className,
+            'modelDir': modelDir,
+            'modelFile': classNameKebab
+        });
+        servicesTemplateData.services.push({
+            'modelClass': className,
+            'serviceDir': serviceDir,
+            'modelFile': classNameKebab
+        });
     }
+
+    // Render list of models and services
+    const renderedModel = mustache.render(modelsTemplateString, modelsTemplateData);
+    fs.writeFileSync(`${outputDir}/${modelDir}.ts`, renderedModel);
+    const renderedServices = mustache.render(servicesTemplateString, servicesTemplateData);
+    fs.writeFileSync(`${outputDir}/${serviceDir}.ts`, renderedServices);
 }
 
 /**
