@@ -298,6 +298,7 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
         const serviceTemplateData = {
             'className': className,
             'classNameKebab': classNameKebab,
+            'modelDir': modelDir,
             'repositoryName': entity
         };
         const renderedService = mustache.render(serviceTemplateString,

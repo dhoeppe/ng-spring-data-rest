@@ -1,6 +1,6 @@
 import {Injectable, Injector} from '@angular/core';
 import {RestService} from '@lagoshny/ngx-hal-client';
-import {$$@className@$$} from '../model/$$@classNameKebab@$$';
+import {$$@className@$$} from '../$$@modelDir@$$/$$@classNameKebab@$$';
 
 @Injectable({
   providedIn: 'root',
