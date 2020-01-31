@@ -19,6 +19,7 @@ const tough = require('tough-cookie');
 const qs = require('qs');
 const jsonTs = require('json-schema-to-typescript');
 const fs = require('fs');
+const fsExtra = require('fs-extra');
 const mustache = require('mustache');
 const _ = require('lodash');
 
@@ -81,6 +82,10 @@ async function doGenerate(options) {
                  {recursive: true});
     fs.mkdirSync(`${options.outputDir}/${options.serviceDir}`,
                  {recursive: true});
+
+    // Empty output directory
+    fsExtra.emptyDirSync(`${options.outputDir}/${options.modelDir}`);
+    fsExtra.emptyDirSync(`${options.outputDir}/${options.serviceDir}`);
     
     // Process JSON schemas based on configuration.
     preProcessSchemas(jsonSchemas, options);
