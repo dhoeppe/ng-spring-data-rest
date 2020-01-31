@@ -20,7 +20,10 @@
     "url": "https://github.com/dhoeppe/ng-spring-data-rest.git"
   },
   "bin": "./ng-spring-data-rest",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "scripts": {
+    "test": "echo \"This project contains no tests.\" && exit 0"
+  },
   "dependencies": {
     "argparse": "^1.0.10",
     "axios": "^0.19.2",

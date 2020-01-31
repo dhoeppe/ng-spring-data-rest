@@ -16,31 +16,34 @@ usage: ng-spring-data-rest [-h] [-v] -b BASEURL [-u USERNAME] [-p PASSWORD]
                            [--service-dir SERVICE_DIR]
                            
 
-Angular class and service generator for use with Spring Data REST and the 
-ngx-hal-client. Generates classes based on the provided JSON schema and ALPS 
-profiles. Allows simple modifications of the generated files.
+Angular class and service generator for use with Spring Data REST and 
+@lagoshny/ngx-hal-client. Generates files based on the provided JSON schema 
+and ALPS profiles. Allows simple modifications of the generated files.
 
 Optional arguments:
   -h, --help            Show this help message and exit.
   -v, --version         Show program's version number and exit.
   -b BASEURL, --base-url BASEURL
-                        The base URL to the Spring Data REST server.
+                        The base URL to the Spring Data REST server. This 
+                        property is required.
   -u USERNAME, --user USERNAME
                         The username to be used when authenticating with the 
-                        Spring Data REST server.
+                        Spring Data REST server. This property is required, 
+                        when authentication is used.
   -p PASSWORD, --password PASSWORD
                         The password to be used when authenticating with the 
-                        Spring Data REST server.
+                        Spring Data REST server. This property is required, 
+                        when authentication is used.
   -a AUTH_METHOD, --auth AUTH_METHOD
-                        The authentication method to use. When using COOKIE 
-                        the body to the authentication endpoint contains a 
-                        JSON object with the properties 'username' and 
-                        'password' with the specified credentials. OAuth2 
-                        does not support scopes.
+                        The authentication method to use. The authentication 
+                        method to use, defaults to NONE. Possible values are 
+                        "NONE", "COOKIE" and "OAUTH2".
   --auth-endpoint AUTH_ENDPOINT
-                        The authentication endpoint URL.
+                        The authentication endpoint URL. When using OAuth2 
+                        this is used as token endpoint.
   --oauth-flow OAUTH_FLOW
-                        The OAuth2 flow to use when authenticating.
+                        The OAuth2 flow to use when authenticating. Currently 
+                        only "PASSWORD" is supported.
   --client CLIENT_NAME  The client name to use for OAuth2 authentication.
   --client-password CLIENT_PASSWORD
                         The client password to use for OAuth2 authentication.
@@ -48,10 +51,8 @@ Optional arguments:
                         A switch to add "additionalProperties": false to 
                         every JSON schema before it is converted.
   --output-dir OUTPUT_DIR
-                        Path the the output directory. If the directory does 
-                        not exist, it is created. If not specified, a new 
-                        folder "gen" is created in the current working 
-                        directory and used as output.
+                        Path of the output directory. If the directory does 
+                        not exist, it is created. Defaults to "./gen".
   --model-dir MODEL_DIR
                         Name of the model directory.
   --service-dir SERVICE_DIR
