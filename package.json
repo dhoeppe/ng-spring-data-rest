@@ -1,11 +1,38 @@
 {
   "name": "ng-spring-data-rest",
+  "description": "This tool provides a command line interface to generate classes and services that use HAl for Angular based on the provided schemas by Spring Data REST.",
+  "homepage": "https://github.com/dhoeppe/ng-spring-data-rest",
+  "keywords": [
+    "angular",
+    "spring-data-rest",
+    "codegen"
+  ],
+  "bugs": {
+    "url": "https://github.com/dhoeppe/ng-spring-data-rest/issues",
+    "email": "ng-spring-data-rest@danielhoeppe.com"
+  },
+  "license": "GPL-3.0-only",
+  "author": "Daniel Höppe <ng-spring-data-rest@danielhoeppe.com>",
+  "main": "ng-spring-data-rest",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dhoeppe/ng-spring-data-rest.git"
+  },
+  "bin": "./ng-spring-data-rest",
   "version": "1.0.0",
   "dependencies": {
     "argparse": "^1.0.10",
     "axios": "^0.19.2",
     "axios-cookiejar-support": "^0.5.1",
+    "json-schema-to-typescript": "^8.0.1",
+    "lodash": "^4.17.15",
+    "mustache": "^4.0.0",
     "qs": "^6.9.1",
     "tough-cookie": "^3.0.1"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=6.0.0",
+    "@lagoshny/ngx-hal-client": "1.0.x"
   }
 }

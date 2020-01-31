@@ -23,13 +23,13 @@ const ArgumentParser = require('argparse').ArgumentParser;
 const pkg = parseJSON(path.join(__dirname, 'package.json'));
 
 const argParser = new ArgumentParser({
-    version: pkg.version,
-    addHelp: true,
-    description: 'Angular class and service generator for use with' +
-        ' Spring Data REST and the ngx-hal-client. Generates classes' +
-        ' based on the provided JSON schema and ALPS profiles.' +
-        ' Allows simple modifications of the generated files.'
-});
+                                         version: pkg.version,
+                                         addHelp: true,
+                                         description: 'Angular class and service generator for use with' +
+                                             ' Spring Data REST and @lagoshny/ngx-hal-client. Generates files' +
+                                             ' based on the provided JSON schema and ALPS profiles.' +
+                                             ' Allows simple modifications of the generated files.'
+                                     });
 argParser.addArgument(
     ['-b', '--base-url'],
     {
@@ -56,28 +56,96 @@ argParser.addArgument(
     ['-a', '--auth'],
     {
         help: 'The authentication method to use.\n' +
-            'When using COOKIE the body to the authentication endpoint contains' +
-            ' the properties \'username\' and \'password\' with the specified credentials.',
+            'When using COOKIE the body to the authentication endpoint contains a JSON object with' +
+            ' the properties \'username\' and \'password\' with the specified credentials.\n\n' +
+            'OAuth2 does not support scopes.',
         dest: 'authMethod',
-        metavar: 'AUTHMETHOD',
-        required: true,
-        choices: ['NONE', 'COOKIE']
+        metavar: 'AUTH_METHOD',
+        defaultValue: 'NONE',
+        choices: ['NONE', 'COOKIE', 'OAUTH2']
     });
 argParser.addArgument(
-    ['-A', '--auth-endpoint'],
+    ['--auth-endpoint'],
     {
-        help: 'The authentication endpoint to use.',
+        help: 'The authentication endpoint URL.',
         dest: 'authEndpoint',
-        metavar: 'AUTHENDPOINT'
+        metavar: 'AUTH_ENDPOINT'
+    });
+argParser.addArgument(
+    ['--oauth-flow'],
+    {
+        help: 'The OAuth2 flow to use when authenticating.',
+        dest: 'oauthFlow',
+        metavar: 'OAUTH_FLOW',
+        choices: ['PASSWORD']
+    });
+argParser.addArgument(
+    ['--client'],
+    {
+        help: 'The client name to use for OAuth2 authentication.',
+        dest: 'clientId',
+        metavar: 'CLIENT_NAME'
+    });
+argParser.addArgument(
+    ['--client-password'],
+    {
+        help: 'The client password to use for OAuth2 authentication.',
+        dest: 'clientPassword',
+        metavar: 'CLIENT_PASSWORD'
+    });
+argParser.addArgument(
+    ['--no-additional-properties'],
+    {
+        help: 'A switch to add "additionalProperties": false to every JSON schema before it is converted.',
+        dest: 'noAdditionalProperties',
+        action: 'storeTrue'
+    });
+argParser.addArgument(
+    ['--output-dir'],
+    {
+        help: 'Path the the output directory. If the directory does not exist, it is created.' +
+            ' If not specified, a new folder "gen" is created in the current working directory' +
+            ' and used as output.',
+        dest: 'outputDir',
+        defaultValue: './gen',
+        metavar: 'OUTPUT_DIR'
+    });
+argParser.addArgument(
+    ['--model-dir'],
+    {
+        help: 'Name of the model directory.',
+        dest: 'modelDir',
+        defaultValue: 'model',
+        metavar: 'MODEL_DIR'
+    });
+argParser.addArgument(
+    ['--service-dir'],
+    {
+        help: 'Name of the service directory.',
+        dest: 'serviceDir',
+        defaultValue: 'service',
+        metavar: 'SERVICE_DIR'
     });
 // TODO add optional config file for modifying input to the json-schema-to-typescript converter
 const args = argParser.parseArgs();
 
 if (args.authMethod !== 'NONE' && (!args.username || !args.password)) {
-    console.error('Authentication method is specified, but either username or password is not provided.');
+    console.error(
+        'Authentication method is specified, but either username or password is not provided.');
     process.exit(1);
 }
+if (args.authMethod === 'OAUTH2') {
+    switch (args.oauthFlow) {
+        case 'PASSWORD':
+            if (!args.clientId || !args.clientPassword) {
+                console.error(
+                    'OAuth2 password flow was chosen as authentication method, but client credentials are incomplete.');
+                process.exit(2);
+            }
+            break;
+    }
+}
 
-// Load generator script and apply it on the args.
+// Load generator script and apply it on the arguments.
 const ngSpringDataRest = require('./ng-spring-data-rest.js');
 ngSpringDataRest(args);
