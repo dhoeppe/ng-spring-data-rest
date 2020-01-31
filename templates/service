@@ -2,7 +2,9 @@ import {Injectable, Injector} from '@angular/core';
 import {RestService} from '@lagoshny/ngx-hal-client';
 import {$$@className@$$} from '../model/$$@classNameKebab@$$';
 
-@Injectable()
+@Injectable({
+  providedIn: 'root',
+})
 export class $$@className@$$Service extends RestService<$$@className@$$> {
   constructor(injector: Injector) {
     super($$@className@$$, '$$@repositoryName@$$', injector);
