@@ -1,5 +1,5 @@
 import {Resource} from '@lagoshny/ngx-hal-client';
-import {$$@interfaceName@$$} from './$$@interfaceNameLower@$$';
+import {$$@interfaceName@$$} from './$$@interfaceNameKebab@$$';
 
 export class $$@className@$$ extends Resource implements $$@interfaceName@$$ {
     constructor() {

@@ -263,42 +263,41 @@ function generateTypeScriptFromSchema(schemas, entities, outputDir, modelDir, se
                 // Add I to the beginning of each class name to indicate interface.
                 tsFile = tsFile.replace(REGEXP_TYPESCRIPT_INTERFACE_NAME,
                                         '$1I$2$3');
-                
+
                 // Construct filename for generated interface file.
                 let matches = tsFile.match(REGEXP_TYPESCRIPT_INTERFACE_NAME);
-                
+
                 const interfaceName = matches[2];
-                const interfaceNameLower = interfaceName.toLowerCase();
+                const interfaceNameKebab = _.kebabCase(interfaceName);
                 const className = interfaceName.substr(1);
-                const classNameLower = className.toLowerCase();
-                const classNameSnake = _.camelCase(className);
-                
+                const classNameKebab = _.kebabCase(className);
+
                 // Write interface file.
-                const interfaceFileName = `${interfaceNameLower}.d.ts`;
+                const interfaceFileName = `${interfaceNameKebab}.d.ts`;
                 fs.writeFileSync(`${outputDir}/${modelDir}/${interfaceFileName}`,
                                  tsFile);
-                
+
                 // Create class from template file.
                 const classTemplateData = {
                     'interfaceName': interfaceName,
-                    'interfaceNameLower': interfaceNameLower,
+                    'interfaceNameKebab': interfaceNameKebab,
                     'className': className
                 };
                 const renderedClass = mustache.render(classTemplateString,
                                                       classTemplateData);
-                const classFileName = `${classNameSnake}.ts`;
+                const classFileName = `${classNameKebab}.ts`;
                 fs.writeFileSync(`${outputDir}/${modelDir}/${classFileName}`,
                                  renderedClass);
-                
+
                 // Create service from template file.
                 const serviceTemplateData = {
                     'className': className,
-                    'classNameLower': classNameLower,
+                    'classNameKebab': classNameKebab,
                     'repositoryName': entity
                 };
                 const renderedService = mustache.render(serviceTemplateString,
                                                         serviceTemplateData);
-                const serviceFileName = `${classNameSnake}.service.ts`;
+                const serviceFileName = `${classNameKebab}.service.ts`;
                 fs.writeFileSync(`${outputDir}/${serviceDir}/${serviceFileName}`,
                                  renderedService);
             });
