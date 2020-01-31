@@ -11,12 +11,8 @@
 
 'use strict';
 
-// Declare constants
-const REGEXP_TYPESCRIPT_INTERFACE_NAME = /^(export interface )(\w+)( {)$/m;
-const PATH_CLASS_TEMPLATE = './templates/class';
-const PATH_SERVICE_TEMPLATE = './templates/service';
-
 // Load dependencies
+const path = require('path');
 const axios = require('axios').default;
 const axiosCookieJarSupport = require('axios-cookiejar-support').default;
 const tough = require('tough-cookie');
@@ -25,6 +21,11 @@ const jsonTs = require('json-schema-to-typescript');
 const fs = require('fs');
 const mustache = require('mustache');
 const _ = require('lodash');
+
+// Declare constants
+const REGEXP_TYPESCRIPT_INTERFACE_NAME = /^(export interface )(\w+)( {)$/m;
+const PATH_CLASS_TEMPLATE = path.join(__dirname, './templates/class');
+const PATH_SERVICE_TEMPLATE = path.join(__dirname, './templates/service');
 
 // Declare global variables
 let axiosInstance = undefined;
