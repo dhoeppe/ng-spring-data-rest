@@ -33,7 +33,7 @@ const argParser = new ArgumentParser({
 argParser.addArgument(
     ['-b', '--base-url'],
     {
-        help: 'The base URL to the Spring Data REST server.',
+        help: 'The base URL to the Spring Data REST server. This property is required.',
         dest: 'baseURL',
         metavar: 'BASEURL',
         required: true
@@ -41,14 +41,16 @@ argParser.addArgument(
 argParser.addArgument(
     ['-u', '--user'],
     {
-        help: 'The username to be used when authenticating with the Spring Data REST server.',
+        help: 'The username to be used when authenticating with the Spring Data REST server.' +
+            ' This property is required, when authentication is used.',
         dest: 'username',
         metavar: 'USERNAME'
     });
 argParser.addArgument(
     ['-p', '--password'],
     {
-        help: 'The password to be used when authenticating with the Spring Data REST server.',
+        help: 'The password to be used when authenticating with the Spring Data REST server.' +
+            ' This property is required, when authentication is used.',
         dest: 'password',
         metavar: 'PASSWORD'
     });
@@ -56,9 +58,8 @@ argParser.addArgument(
     ['-a', '--auth'],
     {
         help: 'The authentication method to use.\n' +
-            'When using COOKIE the body to the authentication endpoint contains a JSON object with' +
-            ' the properties \'username\' and \'password\' with the specified credentials.\n\n' +
-            'OAuth2 does not support scopes.',
+            'The authentication method to use, defaults to NONE.\n' +
+            'Possible values are "NONE", "COOKIE" and "OAUTH2".',
         dest: 'authMethod',
         metavar: 'AUTH_METHOD',
         defaultValue: 'NONE',
@@ -67,14 +68,14 @@ argParser.addArgument(
 argParser.addArgument(
     ['--auth-endpoint'],
     {
-        help: 'The authentication endpoint URL.',
+        help: 'The authentication endpoint URL. When using OAuth2 this is used as token endpoint.',
         dest: 'authEndpoint',
         metavar: 'AUTH_ENDPOINT'
     });
 argParser.addArgument(
     ['--oauth-flow'],
     {
-        help: 'The OAuth2 flow to use when authenticating.',
+        help: 'The OAuth2 flow to use when authenticating. Currently only "PASSWORD" is supported.',
         dest: 'oauthFlow',
         metavar: 'OAUTH_FLOW',
         choices: ['PASSWORD']
@@ -103,9 +104,8 @@ argParser.addArgument(
 argParser.addArgument(
     ['--output-dir'],
     {
-        help: 'Path the the output directory. If the directory does not exist, it is created.' +
-            ' If not specified, a new folder "gen" is created in the current working directory' +
-            ' and used as output.',
+        help: 'Path of the output directory. If the directory does not exist, it is created.\n' +
+            'Defaults to "./gen".',
         dest: 'outputDir',
         defaultValue: './gen',
         metavar: 'OUTPUT_DIR'
