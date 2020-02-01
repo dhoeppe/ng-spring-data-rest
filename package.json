@@ -20,7 +20,7 @@
     "url": "https://github.com/dhoeppe/ng-spring-data-rest.git"
   },
   "bin": "./ng-spring-data-rest",
-  "version": "1.0.3",
+  "version": "2.0.0",
   "scripts": {
     "test": "echo \"This project contains no tests.\" && exit 0"
   },
