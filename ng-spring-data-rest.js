@@ -25,6 +25,7 @@ const _ = require('lodash');
 
 // Declare constants
 const REGEXP_TYPESCRIPT_INTERFACE_NAME = /^(export interface )(\w+)( {)$/m;
+const REGEXP_TYPESCRIPT_INTERFACE_ATTRIBUTES = /^export interface \w+ {\n((.|\n)*)}$/m;
 const PATH_CLASS_TEMPLATE = path.join(__dirname, './templates/class');
 const PATH_SERVICE_TEMPLATE = path.join(__dirname, './templates/service');
 const PATH_MODELS_TEMPLATE = path.join(__dirname, './templates/models');
@@ -269,29 +270,28 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
         const entity = entities[index];
 
         // Apply json-schema-to-typescript conversion.
-        let tsFile = await jsonTs.compile(schema, schema.title);
+        let interfaceDefinition = await jsonTs.compile(schema, schema.title, { bannerComment: null });
 
         // Add I to the beginning of each class name to indicate interface.
-        tsFile = tsFile.replace(REGEXP_TYPESCRIPT_INTERFACE_NAME, '$1I$2$3');
+        interfaceDefinition = interfaceDefinition.replace(REGEXP_TYPESCRIPT_INTERFACE_NAME, '$1I$2$3');
 
         // Construct filename for generated interface file.
-        let matches = tsFile.match(REGEXP_TYPESCRIPT_INTERFACE_NAME);
+        let matches = interfaceDefinition.match(REGEXP_TYPESCRIPT_INTERFACE_NAME);
 
         const interfaceName = matches[2];
-        const interfaceNameKebab = _.kebabCase(interfaceName);
         const className = interfaceName.substr(1);
         const classNameKebab = _.kebabCase(className);
 
-        // Write interface file.
-        const interfaceFileName = `${interfaceNameKebab}.d.ts`;
-        fs.writeFileSync(`${outputDir}/${modelDir}/${interfaceFileName}`,
-                         tsFile);
+        // Extract the attributes from the interface file
+        matches = interfaceDefinition.match(REGEXP_TYPESCRIPT_INTERFACE_ATTRIBUTES);
+        const classAttributes = matches[1];
 
         // Create class from template file.
         const classTemplateData = {
+            'interfaceDefinition': interfaceDefinition,
             'interfaceName': interfaceName,
-            'interfaceNameKebab': interfaceNameKebab,
-            'className': className
+            'className': className,
+            'classAttributes': classAttributes
         };
         const renderedClass = mustache.render(classTemplateString,
                                               classTemplateData);
@@ -314,17 +314,10 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
 
         // Append to models and services list
         modelsTemplateData.models.push({
-            'modelClass': interfaceName,
-            'modelDir': modelDir,
-            'modelFile': interfaceNameKebab
-        });
-        modelsTemplateData.models.push({
-            'modelClass': className,
             'modelDir': modelDir,
             'modelFile': classNameKebab
         });
         servicesTemplateData.services.push({
-            'modelClass': className,
             'serviceDir': serviceDir,
             'modelFile': classNameKebab
         });
