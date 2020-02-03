@@ -314,17 +314,10 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
 
         // Append to models and services list
         modelsTemplateData.models.push({
-            'modelClass': interfaceName,
-            'modelDir': modelDir,
-            'modelFile': classNameKebab
-        });
-        modelsTemplateData.models.push({
-            'modelClass': className,
             'modelDir': modelDir,
             'modelFile': classNameKebab
         });
         servicesTemplateData.services.push({
-            'modelClass': className,
             'serviceDir': serviceDir,
             'modelFile': classNameKebab
         });
