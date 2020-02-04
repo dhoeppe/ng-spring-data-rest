@@ -25,7 +25,7 @@ const _ = require('lodash');
 
 // Declare constants
 const REGEXP_TYPESCRIPT_INTERFACE_NAME = /^(export interface )(\w+)( {)$/m;
-const REGEXP_TYPESCRIPT_INTERFACE_ATTRIBUTES = /^export interface \w+ {\n((.|\n)*)}$/m;
+const REGEXP_TYPESCRIPT_INTERFACE_ATTRIBUTES = /^export interface \w+ {\n((.|\n)*?)}$/m;
 const PATH_CLASS_TEMPLATE = path.join(__dirname, './templates/class');
 const PATH_SERVICE_TEMPLATE = path.join(__dirname, './templates/service');
 const PATH_MODELS_TEMPLATE = path.join(__dirname, './templates/models');
