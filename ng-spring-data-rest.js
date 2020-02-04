@@ -311,16 +311,23 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
         const serviceFileName = `${classNameKebab}.service.ts`;
         fs.writeFileSync(`${outputDir}/${serviceDir}/${serviceFileName}`,
                          renderedService);
-
+    
         // Append to models and services list
         modelsTemplateData.models.push({
-            'modelDir': modelDir,
-            'modelFile': classNameKebab
-        });
+                                           'modelClass': interfaceName,
+                                           'modelDir': modelDir,
+                                           'modelFile': classNameKebab
+                                       });
+        modelsTemplateData.models.push({
+                                           'modelClass': className,
+                                           'modelDir': modelDir,
+                                           'modelFile': classNameKebab
+                                       });
         servicesTemplateData.services.push({
-            'serviceDir': serviceDir,
-            'modelFile': classNameKebab
-        });
+                                               'modelClass': className,
+                                               'serviceDir': serviceDir,
+                                               'modelFile': classNameKebab
+                                           });
     }
 
     // Render list of models and services
