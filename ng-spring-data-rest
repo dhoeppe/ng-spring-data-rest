@@ -117,6 +117,13 @@ argParser.addArgument(
         action: 'storeTrue'
     });
 argParser.addArgument(
+    ['--no-trivial-types'],
+    {
+        help: 'A switch to not generate aliases for types that are not referenced (e.g. string, number or boolean)',
+        dest: 'noTrivialTypes',
+        action: 'storeTrue'
+    });
+argParser.addArgument(
     ['--output-dir'],
     {
         help: 'Path of the output directory. If the directory does not exist, it is created.\n' +
