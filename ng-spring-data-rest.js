@@ -77,13 +77,14 @@ async function doGenerate(options) {
     
     // Collect JSON schemas.
     const jsonSchemas = await collectSchemas(entities);
+    const alpsProfiles = await collectAlps(entities);
     
     // Create output directory.
     fs.mkdirSync(`${options.outputDir}/${options.modelDir}`,
                  {recursive: true});
     fs.mkdirSync(`${options.outputDir}/${options.serviceDir}`,
                  {recursive: true});
-
+    
     // Empty output directory
     fsExtra.emptyDirSync(`${options.outputDir}/${options.modelDir}`);
     fsExtra.emptyDirSync(`${options.outputDir}/${options.serviceDir}`);
@@ -120,7 +121,7 @@ function doLogin(options) {
                                           options.clientId,
                                           options.clientPassword)
                 .then(response => {
-                    axiosInstance.defaults.headers.common['Authorization'] = response.data.access_token;
+                    axiosInstance.defaults.headers.common['Authorization'] = 'Bearer ' + response.data.access_token;
                 })
     }
 }
@@ -196,12 +197,12 @@ function collectEntities() {
                     'Response does not contain _links element. Could not collect entities.');
                 process.exit(4);
             }
-            
+    
             const keys = Object.keys(response.data._links);
             removeElementFromArray(keys, 'self');
             return keys;
         })
-        .catch(() => {
+        .catch(response => {
             console.error('Collecting entities failed.');
             process.exit(3);
         });
@@ -210,7 +211,7 @@ function collectEntities() {
 /**
  * Retrieves the JSON schema provided by Spring Data REST for each of the entities in the given array.
  *
- * @param entities An array containing strings with the name of each repository in Spring Data REST.
+ * @param entities An array containing strings with the name of each repository by Spring Data REST.
  * @returns {Promise<[]>} Promise for an array of JSON schemas.
  */
 async function collectSchemas(entities) {
@@ -225,11 +226,35 @@ async function collectSchemas(entities) {
             })
             .catch(() => {
                 console.error(`Could not collect schema for '${element}'.`);
-                process.exit(4);
+                process.exit(6);
             });
     }
     
     return schemas;
+}
+
+/**
+ * Retrieves the ALPS profile provided by Spring Data REST for each of the entities in the given array.
+ *
+ * @param entities An array containing strings with the name of each repository by Spring Data REST.
+ * @returns {Promise<void>} Promise for an array of ALPS profiles.
+ */
+async function collectAlps(entities) {
+    const alps = [];
+    console.log('Collecting ALPS profiles.');
+    
+    for (const element of entities) {
+        await axiosInstance.get(`profile/${element}`)
+            .then(response => {
+                alps.push(response.data);
+            })
+            .catch(() => {
+                console.error(`Could not collect ALPS profile for '${element}'.`);
+                process.exit(7);
+            })
+    }
+    
+    return alps;
 }
 
 /**
@@ -262,30 +287,35 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
     const serviceTemplateString = fs.readFileSync(PATH_SERVICE_TEMPLATE).toString();
     const modelsTemplateString = fs.readFileSync(PATH_MODELS_TEMPLATE).toString();
     const servicesTemplateString = fs.readFileSync(PATH_SERVICES_TEMPLATE).toString();
-    const modelsTemplateData = { 'models': [] };
-    const servicesTemplateData = { 'services': [] };
-
+    const modelsTemplateData = {'models': []};
+    const servicesTemplateData = {'services': []};
+    
     for (let index = 0; index < schemas.length; index++) {
         const schema = schemas[index];
         const entity = entities[index];
-
+        
         // Apply json-schema-to-typescript conversion.
-        let interfaceDefinition = await jsonTs.compile(schema, schema.title, { bannerComment: null });
-
+        let interfaceDefinition = await jsonTs.compile(schema,
+                                                       schema.title,
+                                                       {bannerComment: null});
+        
         // Add I to the beginning of each class name to indicate interface.
-        interfaceDefinition = interfaceDefinition.replace(REGEXP_TYPESCRIPT_INTERFACE_NAME, '$1I$2$3');
-
+        interfaceDefinition = interfaceDefinition.replace(
+            REGEXP_TYPESCRIPT_INTERFACE_NAME,
+            '$1I$2$3');
+        
         // Construct filename for generated interface file.
         let matches = interfaceDefinition.match(REGEXP_TYPESCRIPT_INTERFACE_NAME);
-
+        
         const interfaceName = matches[2];
         const className = interfaceName.substr(1);
         const classNameKebab = _.kebabCase(className);
-
+        
         // Extract the attributes from the interface file
-        matches = interfaceDefinition.match(REGEXP_TYPESCRIPT_INTERFACE_ATTRIBUTES);
+        matches = interfaceDefinition.match(
+            REGEXP_TYPESCRIPT_INTERFACE_ATTRIBUTES);
         const classAttributes = matches[1];
-
+        
         // Create class from template file.
         const classTemplateData = {
             'interfaceDefinition': interfaceDefinition,
@@ -298,7 +328,7 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
         const classFileName = `${classNameKebab}.ts`;
         fs.writeFileSync(`${outputDir}/${modelDir}/${classFileName}`,
                          renderedClass);
-
+        
         // Create service from template file.
         const serviceTemplateData = {
             'className': className,
@@ -311,7 +341,7 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
         const serviceFileName = `${classNameKebab}.service.ts`;
         fs.writeFileSync(`${outputDir}/${serviceDir}/${serviceFileName}`,
                          renderedService);
-    
+        
         // Append to models and services list
         modelsTemplateData.models.push({
                                            'modelClass': interfaceName,
@@ -329,11 +359,13 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
                                                'modelFile': classNameKebab
                                            });
     }
-
+    
     // Render list of models and services
-    const renderedModel = mustache.render(modelsTemplateString, modelsTemplateData);
+    const renderedModel = mustache.render(modelsTemplateString,
+                                          modelsTemplateData);
     fs.writeFileSync(`${outputDir}/${modelDir}.ts`, renderedModel);
-    const renderedServices = mustache.render(servicesTemplateString, servicesTemplateData);
+    const renderedServices = mustache.render(servicesTemplateString,
+                                             servicesTemplateData);
     fs.writeFileSync(`${outputDir}/${serviceDir}.ts`, renderedServices);
 }
 

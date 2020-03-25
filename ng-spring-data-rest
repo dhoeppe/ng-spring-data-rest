@@ -137,7 +137,7 @@ if (args.authMethod !== 'NONE' && (!args.username || !args.password)) {
 if (args.authMethod === 'OAUTH2') {
     switch (args.oauthFlow) {
         case 'PASSWORD':
-            if (!args.clientId || !args.clientPassword) {
+            if (!args.clientId) {
                 console.error(
                     'OAuth2 password flow was chosen as authentication method, but client credentials are incomplete.');
                 process.exit(2);
