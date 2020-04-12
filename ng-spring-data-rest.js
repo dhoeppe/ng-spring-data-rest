@@ -1,12 +1,27 @@
 /*
  * This file is part of the ng-spring-data-rest project (https://github.com/dhoeppe/ng-spring-data-rest).
- * Copyright (c) 2020 Daniel Höppe.
  *
- * ng-spring-data-rest is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 3.
+ * MIT License
  *
- * ng-spring-data-rest is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+ * Copyright (c) 2020 Daniel Höppe
  *
- * You should have received a copy of the GNU General Public License along with ng-spring-data-rest.  If not, see https://github.com/dhoeppe/ng-spring-data-rest.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 'use strict';
@@ -22,10 +37,16 @@ const fs = require('fs');
 const fsExtra = require('fs-extra');
 const mustache = require('mustache');
 const _ = require('lodash');
+const pluralize = require('pluralize');
 
 // Declare constants
 const REGEXP_TYPESCRIPT_INTERFACE_NAME = /^(export interface )(\w+)( {)$/m;
 const REGEXP_TYPESCRIPT_INTERFACE_ATTRIBUTES = /^export interface \w+ {\n((.|\n)*?)}$/m;
+const REGEXP_RT_ENTITY_NAME = /#(\w+)-/;
+const REGEXP_OWN_ENTITY_NAME = /(\w+)-/;
+const STR_APPEND_REGEXP_TYPESCRIPT_PROPERTY_TYPE = '\\??: )(.+)(;)$';
+const STR_REGEXP_TYPESCRIPT_EXPORT_TYPE = 'export type $$@$$.*;\\n';
+const STR_IMPORT_REPLACE = 'import { Resource } from \'@lagoshny/ngx-hal-client\';';
 const PATH_CLASS_TEMPLATE = path.join(__dirname, './templates/class');
 const PATH_SERVICE_TEMPLATE = path.join(__dirname, './templates/service');
 const PATH_MODELS_TEMPLATE = path.join(__dirname, './templates/models');
@@ -56,7 +77,7 @@ function ngSpringDataRest(options) {
 }
 
 /**
- * Generates the output classes.
+ * Generates the output files.
  *
  * @param options The command line parameters and further configuration.
  */
@@ -72,12 +93,15 @@ async function doGenerate(options) {
     }
     
     // Collect models to generate files for.
-    const entities = await collectEntities();
+    const entities = await collectRepositories();
     console.log('Collected list of entities.');
     
     // Collect JSON schemas.
-    const jsonSchemas = await collectSchemas(entities);
-    const alpsProfiles = await collectAlps(entities);
+    await collectSchemas(entities);
+    await collectAlpsAndPopulateNames(entities);
+    
+    // Process JSON schemas based on configuration.
+    preProcessSchemas(entities, options);
     
     // Create output directory.
     fs.mkdirSync(`${options.outputDir}/${options.modelDir}`,
@@ -85,25 +109,21 @@ async function doGenerate(options) {
     fs.mkdirSync(`${options.outputDir}/${options.serviceDir}`,
                  {recursive: true});
     
-    // Empty output directory
+    // Empty output directory.
     fsExtra.emptyDirSync(`${options.outputDir}/${options.modelDir}`);
     fsExtra.emptyDirSync(`${options.outputDir}/${options.serviceDir}`);
     
-    // Process JSON schemas based on configuration.
-    preProcessSchemas(jsonSchemas, options);
-    
     // Convert each schema to TypeScript classes and services.
-    generateTypeScriptFromSchema(jsonSchemas,
-                                 entities,
-                                 options.outputDir,
-                                 options.modelDir,
-                                 options.serviceDir);
+    await generateTypeScriptFromSchema(entities,
+                                       options.outputDir,
+                                       options.modelDir,
+                                       options.serviceDir);
 }
 
 /**
  * Performs the login based on the provided authentication method.
  *
- * @param options The command line options.
+ * @param options The command line parameters and further configuration.
  * @returns {Promise} promise for the request.
  */
 function doLogin(options) {
@@ -139,7 +159,7 @@ function doLogin(options) {
  * @param authEndpoint The authentication endpoint URL to use, fully qualified.
  * @param username
  * @param password
- * @returns {Promise} Promise for the POST request to the authentication endpoint.
+ * @returns {Promise<{}>} Promise for the POST request to the authentication endpoint.
  */
 function authenticateWithCookies(authEndpoint, username, password) {
     return axiosInstance.post(authEndpoint,
@@ -160,7 +180,7 @@ function authenticateWithCookies(authEndpoint, username, password) {
  * @param password
  * @param client
  * @param clientPassword
- * @returns {Promise} Promise for the POST request to the authentication endpoint.
+ * @returns {Promise<{}>} Promise for the POST request to the authentication endpoint.
  */
 function authenticateWithOAuth2(flow, authEndpoint, username, password, client, clientPassword) {
     switch (flow) {
@@ -187,9 +207,9 @@ function authenticateWithOAuth2(flow, authEndpoint, username, password, client, 
  * Retrieves an array of repository endpoint names provided by Spring Data REST using
  * the <host>/<basePath>/profile endpoints.
  *
- * @returns {Promise<[]>} Promise for an array of strings containing the repository names.
+ * @returns {Promise<{}>} Promise for an object containing the repository names.
  */
-function collectEntities() {
+function collectRepositories() {
     return axiosInstance.get('profile')
         .then(response => {
             if (!('_links' in response.data)) {
@@ -197,10 +217,16 @@ function collectEntities() {
                     'Response does not contain _links element. Could not collect entities.');
                 process.exit(4);
             }
-    
+            
+            const entities = {};
             const keys = Object.keys(response.data._links);
             removeElementFromArray(keys, 'self');
-            return keys;
+            
+            for (const key of keys) {
+                entities[key] = {'repository': key};
+            }
+            
+            return entities;
         })
         .catch(response => {
             console.error('Collecting entities failed.');
@@ -211,76 +237,123 @@ function collectEntities() {
 /**
  * Retrieves the JSON schema provided by Spring Data REST for each of the entities in the given array.
  *
- * @param entities An array containing strings with the name of each repository by Spring Data REST.
- * @returns {Promise<[]>} Promise for an array of JSON schemas.
+ * @param entities An array containing objects with the name of each repository provided by Spring Data REST.
  */
 async function collectSchemas(entities) {
-    const schemas = [];
     console.log('Collecting schemas.');
     
-    for (const element of entities) {
-        await axiosInstance.get(`profile/${element}`,
+    for (const key in entities) {
+        const element = entities[key];
+        
+        await axiosInstance.get(`profile/${key}`,
                                 {headers: {'Accept': 'application/schema+json'}})
             .then(response => {
-                schemas.push(response.data);
+                element['schema'] = response.data;
             })
             .catch(() => {
-                console.error(`Could not collect schema for '${element}'.`);
+                console.error(`Could not collect schema for '${key}'.`);
                 process.exit(6);
             });
     }
-    
-    return schemas;
 }
 
 /**
  * Retrieves the ALPS profile provided by Spring Data REST for each of the entities in the given array.
  *
- * @param entities An array containing strings with the name of each repository by Spring Data REST.
- * @returns {Promise<void>} Promise for an array of ALPS profiles.
+ * @param entities An array containing objects with the name of each repository and schemas provided by Spring Data REST.
  */
-async function collectAlps(entities) {
-    const alps = [];
+async function collectAlpsAndPopulateNames(entities) {
     console.log('Collecting ALPS profiles.');
     
-    for (const element of entities) {
-        await axiosInstance.get(`profile/${element}`)
+    for (const key in entities) {
+        const element = entities[key];
+        
+        await axiosInstance.get(`profile/${key}`)
             .then(response => {
-                alps.push(response.data);
+                element['alps'] = response.data['alps'];
+                element['name'] = element['alps']['descriptor'][0]['id'].match(
+                    REGEXP_OWN_ENTITY_NAME)[1];
             })
             .catch(() => {
-                console.error(`Could not collect ALPS profile for '${element}'.`);
+                console.error(`Could not collect ALPS profile for '${key}'.`);
                 process.exit(7);
             })
     }
-    
-    return alps;
 }
 
 /**
  * Pre-Processes schemas according to the given configuration.
  *
- * @param schemas
- * @param config
+ * @param entities An array of objects with repository names, schemas and ALPS profiles.
+ * @param config The loaded configuration.
  */
-function preProcessSchemas(schemas, config) {
-    for (const schema of schemas) {
+function preProcessSchemas(entities, config) {
+    for (const key in entities) {
         if (config.noAdditionalProperties) {
-            schema.additionalProperties = false;
+            entities[key].schema.additionalProperties = false;
         }
     }
 }
 
 /**
+ * Post processes TypeScript files.
+ * Replaces all references to other types with the respective types.
+ *
+ * @param entities The list of all entities.
+ * @param entity The entity to process.
+ * @param renderedClass The rendered TypeScript class.
+ * @param modelDir The model directory.
+ * @returns {*} The modified class.
+ */
+function postProcessTypeScriptFiles(entities, entity, renderedClass, modelDir) {
+    for (const property of entity['alps']['descriptor'][0]['descriptor']) {
+        if ('rt' in property) {
+            const propertyName = property['name'];
+            let referencedEntity = property['rt'].match(REGEXP_RT_ENTITY_NAME)[0];
+            let newPropertyType;
+            
+            referencedEntity = upperCamelCase(referencedEntity);
+            
+            if (pluralize.isPlural(propertyName)) {
+                newPropertyType = `${referencedEntity}[]`;
+            } else {
+                newPropertyType = `${referencedEntity}`;
+            }
+            
+            const oldTypeMatches = renderedClass.match(new RegExp('(' + propertyName + STR_APPEND_REGEXP_TYPESCRIPT_PROPERTY_TYPE,
+                                                                  'm'));
+            const exportRemoved = renderedClass.replace(new RegExp(
+                STR_REGEXP_TYPESCRIPT_EXPORT_TYPE.replace('$$@$$',
+                                                          oldTypeMatches[2]),
+                ''), '');
+            const typeReplaced = exportRemoved.replace(new RegExp(escapeRegExp(
+                oldTypeMatches[0]), 'g'),
+                                                       oldTypeMatches[1] + newPropertyType + oldTypeMatches[3]);
+            
+            const newImport = `import { ${referencedEntity} } from './${_.kebabCase(
+                referencedEntity)}';`;
+            
+            if (typeReplaced.includes(newImport)) {
+                renderedClass = typeReplaced
+            } else {
+                renderedClass = typeReplaced.replace(STR_IMPORT_REPLACE,
+                                                     `${STR_IMPORT_REPLACE}\n${newImport}`);
+            }
+        }
+    }
+    
+    return renderedClass;
+}
+
+/**
  * Generates TypeScript classes in the 'model' directory from the given JSON schemas.
  *
- * @param schemas The JSON schemas to convert.
  * @param entities The array of entities, must match the schemas array.
  * @param outputDir The output directory to use. Models are generated in the 'model' subdirectory.
  * @param modelDir The name of the model directory.
  * @param serviceDir The name of the service directory.
  */
-async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelDir, serviceDir) {
+async function generateTypeScriptFromSchema(entities, outputDir, modelDir, serviceDir) {
     console.log(`Generating files.`);
     
     const classTemplateString = fs.readFileSync(PATH_CLASS_TEMPLATE).toString();
@@ -290,13 +363,12 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
     const modelsTemplateData = {'models': []};
     const servicesTemplateData = {'services': []};
     
-    for (let index = 0; index < schemas.length; index++) {
-        const schema = schemas[index];
-        const entity = entities[index];
+    for (const key in entities) {
+        const element = entities[key];
         
         // Apply json-schema-to-typescript conversion.
-        let interfaceDefinition = await jsonTs.compile(schema,
-                                                       schema.title,
+        let interfaceDefinition = await jsonTs.compile(element.schema,
+                                                       element.name,
                                                        {bannerComment: null});
         
         // Add I to the beginning of each class name to indicate interface.
@@ -323,9 +395,14 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
             'className': className,
             'classAttributes': classAttributes
         };
-        const renderedClass = mustache.render(classTemplateString,
-                                              classTemplateData);
+        const renderedClass = postProcessTypeScriptFiles(entities,
+                                                         element,
+                                                         mustache.render(
+                                                             classTemplateString,
+                                                             classTemplateData),
+                                                         modelDir);
         const classFileName = `${classNameKebab}.ts`;
+        
         fs.writeFileSync(`${outputDir}/${modelDir}/${classFileName}`,
                          renderedClass);
         
@@ -334,7 +411,7 @@ async function generateTypeScriptFromSchema(schemas, entities, outputDir, modelD
             'className': className,
             'classNameKebab': classNameKebab,
             'modelDir': modelDir,
-            'repositoryName': entity
+            'repositoryName': element
         };
         const renderedService = mustache.render(serviceTemplateString,
                                                 serviceTemplateData);
@@ -381,5 +458,29 @@ function removeElementFromArray(array, element) {
         array.splice(elementIndex, 1);
     }
 }
+
+/**
+ * Converts the given string to upper camel case.
+ *
+ * @param toConvert The string to convert.
+ * @returns {string} The string to convert in upper camel case.
+ */
+function upperCamelCase(toConvert) {
+    const inCamelCase = _.camelCase(toConvert);
+    
+    return inCamelCase.charAt(0).toUpperCase() + inCamelCase.substr(1,
+                                                                    inCamelCase.length - 1);
+}
+
+/**
+ * Escapes the given string to be used in regular expressions.
+ *
+ * @param string The string to escape.
+ * @returns {string|void|*} An escaped string.
+ */
+function escapeRegExp(string) {
+    return string.replace(/[.*+\-?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
 
 module.exports = ngSpringDataRest;
