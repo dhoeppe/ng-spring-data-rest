@@ -292,6 +292,28 @@ function preProcessSchemas(entities, config) {
         if (config.noAdditionalProperties) {
             entities[key].schema.additionalProperties = false;
         }
+        if (config.noTrivialTypes) {
+            removeTrivialTitles(entities[key].schema.properties || {});
+            removeTrivialTitles(entities[key].schema.definitions || {});
+        }
+    }
+}
+
+/**
+ * Remove the title properties from object attributes that do not have a $ref property set.
+ * This causes json-schema-to-typescript not to generate aliases for trivial types like string, number or boolean.
+ *
+ * @param object
+ */
+function removeTrivialTitles(object) {
+    for (const key of Object.keys(object)) {
+        const property = object[key];
+        if (!property['$ref']) {
+            delete property.title;
+        }
+        if (property.properties) {
+            removeTrivialTitles(property.properties);
+        }
     }
 }
 
