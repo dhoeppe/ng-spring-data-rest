@@ -54,6 +54,7 @@ const PATH_SERVICES_TEMPLATE = path.join(__dirname, './templates/services');
 
 // Declare global variables
 let axiosInstance = undefined;
+let descriptorName = 'descriptor';
 
 /**
  * Entry point to this script, bootstraps the generation process.
@@ -96,8 +97,8 @@ async function doGenerate(options) {
     const entities = await collectRepositories();
     console.log('Collected list of entities.');
     
-    // Collect JSON schemas.
     await collectSchemas(entities);
+    await analyzeEnvironment(entities);
     await collectAlpsAndPopulateNames(entities);
     
     // Process JSON schemas based on configuration.
@@ -204,6 +205,34 @@ function authenticateWithOAuth2(flow, authEndpoint, username, password, client, 
 }
 
 /**
+ * Analyzes the Spring Data REST environment, currently only whether descriptor properties are called
+ * 'descriptor' or 'descriptors'.
+ *
+ * @param entities An object containing keys named by the repositories provided by Spring Data REST.
+ * @returns {Promise<void>}
+ */
+async function analyzeEnvironment(entities) {
+    const entitiesKeys = Object.keys(entities);
+    
+    if (entitiesKeys.length > 0) {
+        const key = entitiesKeys[0];
+        
+        await axiosInstance.get(`profile/${key}`)
+            .then(response => {
+                if ('descriptor' in response.data['alps']) {
+                    descriptorName = 'descriptor';
+                } else if ('descriptors' in response.data['alps']) {
+                    descriptorName = 'descriptors';
+                }
+            })
+            .catch(() => {
+                console.error('Could not determine environment.');
+                process.exit(8);
+            });
+    }
+}
+
+/**
  * Retrieves an array of repository endpoint names provided by Spring Data REST using
  * the <host>/<basePath>/profile endpoints.
  *
@@ -228,7 +257,7 @@ function collectRepositories() {
             
             return entities;
         })
-        .catch(response => {
+        .catch(() => {
             console.error('Collecting entities failed.');
             process.exit(3);
         });
@@ -271,7 +300,7 @@ async function collectAlpsAndPopulateNames(entities) {
         await axiosInstance.get(`profile/${key}`)
             .then(response => {
                 element['alps'] = response.data['alps'];
-                element['name'] = element['alps']['descriptors'][0]['id'].match(
+                element['name'] = element['alps'][descriptorName][0]['id'].match(
                     REGEXP_OWN_ENTITY_NAME)[1];
             })
             .catch(() => {
@@ -328,7 +357,7 @@ function removeTrivialTitles(object) {
  * @returns {*} The modified class.
  */
 function postProcessTypeScriptFiles(entities, entity, renderedClass, modelDir) {
-    for (const property of entity['alps']['descriptors'][0]['descriptors']) {
+    for (const property of entity['alps'][descriptorName][0][descriptorName]) {
         if ('rt' in property) {
             const propertyName = property['name'];
             let referencedEntity = property['rt'].match(REGEXP_RT_ENTITY_NAME)[0];

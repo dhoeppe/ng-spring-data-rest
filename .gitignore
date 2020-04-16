@@ -178,3 +178,4 @@ dist
 .tern-port
 
 gen
+.idea/aws.xml
