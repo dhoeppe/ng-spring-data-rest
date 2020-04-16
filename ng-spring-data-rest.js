@@ -271,7 +271,7 @@ async function collectAlpsAndPopulateNames(entities) {
         await axiosInstance.get(`profile/${key}`)
             .then(response => {
                 element['alps'] = response.data['alps'];
-                element['name'] = element['alps']['descriptor'][0]['id'].match(
+                element['name'] = element['alps']['descriptors'][0]['id'].match(
                     REGEXP_OWN_ENTITY_NAME)[1];
             })
             .catch(() => {
@@ -328,7 +328,7 @@ function removeTrivialTitles(object) {
  * @returns {*} The modified class.
  */
 function postProcessTypeScriptFiles(entities, entity, renderedClass, modelDir) {
-    for (const property of entity['alps']['descriptor'][0]['descriptor']) {
+    for (const property of entity['alps']['descriptors'][0]['descriptors']) {
         if ('rt' in property) {
             const propertyName = property['name'];
             let referencedEntity = property['rt'].match(REGEXP_RT_ENTITY_NAME)[0];
@@ -433,7 +433,7 @@ async function generateTypeScriptFromSchema(entities, outputDir, modelDir, servi
             'className': className,
             'classNameKebab': classNameKebab,
             'modelDir': modelDir,
-            'repositoryName': element
+            'repositoryName': element.repository
         };
         const renderedService = mustache.render(serviceTemplateString,
                                                 serviceTemplateData);
